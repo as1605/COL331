@@ -1,1 +1,1 @@
-obj-y := add.o
+obj-y := add.o ctxt_switch.o

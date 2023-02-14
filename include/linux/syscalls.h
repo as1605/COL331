@@ -72,6 +72,7 @@ struct open_how;
 struct mount_attr;
 struct landlock_ruleset_attr;
 enum landlock_rule_type;
+struct pid_ctxt_switch;
 
 #include <linux/types.h>
 #include <linux/aio_abi.h>
@@ -1276,7 +1277,13 @@ asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
  */
 asmlinkage long sys_ni_syscall(void);
 
+/* col331/add.c */
 asmlinkage long sys_add(int a, int b);
+
+/* col331/ctxt_switch.c */
+asmlinkage long register(pid_t pid);
+asmlinkage long fetch(struct pid_ctxt_switch * stats);
+asmlinkage long deregister(pid_t pid);
 
 #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
 

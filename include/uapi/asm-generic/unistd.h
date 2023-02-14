@@ -889,8 +889,17 @@ __SYSCALL(__NR_set_mempolicy_home_node, sys_set_mempolicy_home_node)
 #define __NR_sys_add 451
 __SYSCALL(__NR_sys_add, sys_add)
 
+#define __NR_sys_register 452
+__SYSCALL(__NR_sys_register, sys_register)
+
+#define __NR_sys_fetch 453
+__SYSCALL(__NR_sys_fetch, sys_fetch)
+
+#define __NR_sys_deregister 454
+__SYSCALL(__NR_sys_deregister, sys_deregister)
+
 #undef __NR_syscalls
-#define __NR_syscalls 452
+#define __NR_syscalls 455
 
 /*
  * 32 bit systems traditionally used different
