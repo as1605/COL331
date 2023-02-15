@@ -9,84 +9,114 @@
 #include <linux/sched/signal.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <linux/pid.h>
+ 
 
 #define AUTHOR "Aditya Singh <ee1200461@iitd.ac.in>"
 #define PROCFS_MAX_SIZE 1024
 #define PROCFS_NAME "sig_target"
 #define PERMS 0666
 #define WORK_QUEUE_NAME "WQsig_target.c"
-#define WQ_TIMER_MS 1000 /* 1000 ms */
+#define WQ_TIMER_DELAY 1000 /* 1000 jiffy = 1s */
 
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR(AUTHOR);
 
 static int timer_interrupt_count = 0;
 
 static struct workqueue_struct *my_workqueue = NULL;
-static struct work_struct work;
+static struct delayed_work work;
 // static DECLARE_WORK(Task, intrpt_routine, NULL);
 
 static struct proc_dir_entry *Sig_Target;
 static char procfs_buffer[PROCFS_MAX_SIZE];
 static unsigned long procfs_buffer_size = 0;
 
-static void work_handler(struct work_struct * work)
+
+static void work_handler(struct work_struct * _work)
 {
+	struct kernel_siginfo info;
+	struct task_struct *task;
+	char *ptr = procfs_buffer;
+		int p, s, ret;
+		pid_t pid;
+		struct pid *v;
 	timer_interrupt_count++;
 
-	// TODO: remove after debugging
-	printk(KERN_ALERT "routine %d\n %s", timer_interrupt_count,
+	printk(KERN_INFO "routine %d\n %s", timer_interrupt_count,
 	       procfs_buffer);
 
-	siginfo_t info;
 	memset(&info, 1, sizeof(info));
-
-	char *ptr = procfs_buffer;
-	while (ptr) {
-		int p, s;
+	
+	while (ptr && procfs_buffer_size) {
 		sscanf(ptr, "%d, %d", &p, &s);
-		pid_t pid = p;
-		struct task_struct *task = find_task_by_vpid(pid);
-		int ret = send_sig_info(s, &info, task);
-		// TODO: remove after debugging
+		pid = p;
 		printk(KERN_ALERT
-		       "sent signal %d to process %d and returned %d",
+		       "sending signal %d to process %d",
+		       s, p);
+		v = find_vpid(pid);
+		if (v == 0) {
+			printk(KERN_ALERT "Invalid PID %d" , v);	
+		} else {
+			printk(KERN_ALERT "v %d" , v);
+			task = pid_task(v, PIDTYPE_PID);
+			ret = send_sig_info(s, &info, task);
+			printk(KERN_ALERT
+			       "sent signal %d to process %d and returned %d",
 		       s, p, ret);
+		}
+		ptr++;
 		ptr = strchr(ptr, '\n');
 	}
 
-	msleep(WQ_TIMER_MS);
+	schedule_delayed_work(&work, WQ_TIMER_DELAY);
 }
 
 static ssize_t procfile_read(
 		struct file *file, char __user *buffer, size_t count, loff_t *ppos
 		)
 {
-	int ret;
+	int ret, c;
 
-	printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROCFS_NAME);
+	printk(KERN_ALERT "procfile_read (/proc/%s) called\n", PROCFS_NAME);
 
 	if (*ppos > 0) {
 		ret = 0;
 	} else {
-		copy_to_user(buffer, procfs_buffer, procfs_buffer_size);
+		c = copy_to_user(buffer, procfs_buffer, procfs_buffer_size);
 		ret = procfs_buffer_size;
 	}
-
+	*ppos = procfs_buffer_size;
 	return ret;
 }
 
 static ssize_t procfile_write(
 		struct file *file, const char __user *buffer,size_t count, loff_t *ppos)
 {
+	printk(KERN_ALERT "procfile_write (/proc/%s) called with count %d\n", PROCFS_NAME, count);
 	procfs_buffer_size = count;
-	if (procfs_buffer_size > PROCFS_MAX_SIZE) {
-		procfs_buffer_size = PROCFS_MAX_SIZE;
-	}
-
-	if (copy_from_user(procfs_buffer, buffer, procfs_buffer_size)) {
+	
+	if (*ppos > 0) {
 		return -EFAULT;
 	}
 
+	if (procfs_buffer_size > PROCFS_MAX_SIZE - 1) {
+		procfs_buffer_size = PROCFS_MAX_SIZE - 1;
+	}
+	printk(KERN_ALERT "writing to %s", procfs_buffer); 
+	if (copy_from_user(procfs_buffer, buffer, procfs_buffer_size)) {
+		return -EFAULT;
+	}
+	procfs_buffer[procfs_buffer_size] = '\0';
+	for (int i=0; i<20; i++) {
+		printk(KERN_ALERT "wrote %d at %d", procfs_buffer[i], i);
+	}
+	
+	int t = strlen(procfs_buffer);	
+	printk(KERN_ALERT "size %d", procfs_buffer_size);
+	printk(KERN_ALERT "ppos %d", *ppos);
+	*ppos = t;
+	printk(KERN_ALERT "ppos %d", *ppos);
 	return procfs_buffer_size;
 }
 
@@ -103,17 +133,17 @@ int init_module()
 		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n", PROCFS_NAME);
 		return -ENOMEM;
 	}
-
-	printk(KERN_INFO "/proc/%s created\n", PROCFS_NAME);
+	printk(KERN_ALERT "/proc/%s created\n", PROCFS_NAME);
 
 	my_workqueue = alloc_workqueue(WORK_QUEUE_NAME, WQ_UNBOUND, 1);
-	INIT_WORK(&work, work_handler); 
-    schedule_work(&work); 
+	INIT_DELAYED_WORK(&work, work_handler); 
+    schedule_delayed_work(&work, WQ_TIMER_DELAY); 
 	return 0;
 }
 
 void cleanup_module()
 {
+	cancel_delayed_work_sync(&work);
 	proc_remove(Sig_Target);
-	printk(KERN_INFO "/proc/%s removed\n", PROCFS_NAME);
+	printk(KERN_ALERT "/proc/%s removed\n", PROCFS_NAME);
 }
