@@ -3,7 +3,7 @@
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/sched/signal.h>
@@ -57,14 +57,15 @@ static void work_handler(struct work_struct * work)
 	msleep(WQ_TIMER_MS);
 }
 
-int procfile_read(char *buffer, char **buffer_location, off_t offset,
-		  int buffer_length, int *eof, void *data)
+static ssize_t procfile_read(
+		struct file *file, char __user *buffer, size_t count, loff_t *ppos
+		)
 {
 	int ret;
 
 	printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROCFS_NAME);
 
-	if (offset > 0) {
+	if (*ppos > 0) {
 		ret = 0;
 	} else {
 		copy_to_user(buffer, procfs_buffer, procfs_buffer_size);
@@ -74,8 +75,8 @@ int procfile_read(char *buffer, char **buffer_location, off_t offset,
 	return ret;
 }
 
-int procfile_write(struct file *file, const char *buffer, unsigned long count,
-		   void *data)
+static ssize_t procfile_write(
+		struct file *file, const char __user *buffer,size_t count, loff_t *ppos)
 {
 	procfs_buffer_size = count;
 	if (procfs_buffer_size > PROCFS_MAX_SIZE) {
