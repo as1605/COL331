@@ -26,7 +26,6 @@ static int timer_interrupt_count = 0;
 
 static struct workqueue_struct *my_workqueue = NULL;
 static struct delayed_work work;
-// static DECLARE_WORK(Task, intrpt_routine, NULL);
 
 static struct proc_dir_entry *Sig_Target;
 static char procfs_buffer[PROCFS_MAX_SIZE];
@@ -51,17 +50,17 @@ static void work_handler(struct work_struct * _work)
 	while (ptr && procfs_buffer_size) {
 		sscanf(ptr, "%d, %d", &p, &s);
 		pid = p;
-		printk(KERN_ALERT
+		printk(KERN_INFO
 		       "sending signal %d to process %d",
 		       s, p);
 		v = find_vpid(pid);
 		if (v == 0) {
 			printk(KERN_ALERT "Invalid PID %d" , v);	
 		} else {
-			printk(KERN_ALERT "v %d" , v);
+			printk(KERN_INFO "virtual pid %d" , v);
 			task = pid_task(v, PIDTYPE_PID);
 			ret = send_sig_info(s, &info, task);
-			printk(KERN_ALERT
+			printk(KERN_INFO
 			       "sent signal %d to process %d and returned %d",
 		       s, p, ret);
 		}
@@ -78,7 +77,7 @@ static ssize_t procfile_read(
 {
 	int ret, c;
 
-	printk(KERN_ALERT "procfile_read (/proc/%s) called\n", PROCFS_NAME);
+	printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROCFS_NAME);
 
 	if (*ppos > 0) {
 		ret = 0;
@@ -93,7 +92,7 @@ static ssize_t procfile_read(
 static ssize_t procfile_write(
 		struct file *file, const char __user *buffer,size_t count, loff_t *ppos)
 {
-	printk(KERN_ALERT "procfile_write (/proc/%s) called with count %d\n", PROCFS_NAME, count);
+	printk(KERN_INFO "procfile_write (/proc/%s) called with count %d\n", PROCFS_NAME, count);
 	procfs_buffer_size = count;
 	
 	if (*ppos > 0) {
@@ -103,20 +102,13 @@ static ssize_t procfile_write(
 	if (procfs_buffer_size > PROCFS_MAX_SIZE - 1) {
 		procfs_buffer_size = PROCFS_MAX_SIZE - 1;
 	}
-	printk(KERN_ALERT "writing to %s", procfs_buffer); 
+
 	if (copy_from_user(procfs_buffer, buffer, procfs_buffer_size)) {
 		return -EFAULT;
 	}
 	procfs_buffer[procfs_buffer_size] = '\0';
-	for (int i=0; i<20; i++) {
-		printk(KERN_ALERT "wrote %d at %d", procfs_buffer[i], i);
-	}
 	
-	int t = strlen(procfs_buffer);	
-	printk(KERN_ALERT "size %d", procfs_buffer_size);
-	printk(KERN_ALERT "ppos %d", *ppos);
-	*ppos = t;
-	printk(KERN_ALERT "ppos %d", *ppos);
+	*ppos = strlen(procfs_buffer);
 	return procfs_buffer_size;
 }
 
