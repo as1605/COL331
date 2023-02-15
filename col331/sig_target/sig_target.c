@@ -10,7 +10,6 @@
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/pid.h>
- 
 
 #define AUTHOR "Aditya Singh <ee1200461@iitd.ac.in>"
 #define PROCFS_MAX_SIZE 1024
@@ -31,38 +30,35 @@ static struct proc_dir_entry *Sig_Target;
 static char procfs_buffer[PROCFS_MAX_SIZE];
 static unsigned long procfs_buffer_size = 0;
 
-
-static void work_handler(struct work_struct * _work)
+static void work_handler(struct work_struct *_work)
 {
 	struct kernel_siginfo info;
 	struct task_struct *task;
 	char *ptr = procfs_buffer;
-		int p, s, ret;
-		pid_t pid;
-		struct pid *v;
+	int p, s, ret;
+	pid_t pid;
+	struct pid *v;
 	timer_interrupt_count++;
 
 	printk(KERN_INFO "routine %d\n %s", timer_interrupt_count,
 	       procfs_buffer);
 
 	memset(&info, 1, sizeof(info));
-	
+
 	while (ptr && procfs_buffer_size) {
 		sscanf(ptr, "%d, %d", &p, &s);
 		pid = p;
-		printk(KERN_INFO
-		       "sending signal %d to process %d",
-		       s, p);
+		printk(KERN_INFO "sending signal %d to process %d", s, p);
 		v = find_vpid(pid);
 		if (v == 0) {
-			printk(KERN_ALERT "Invalid PID %d" , v);	
+			printk(KERN_ALERT "Invalid PID %d", v);
 		} else {
-			printk(KERN_INFO "virtual pid %d" , v);
+			printk(KERN_INFO "virtual pid %d", v);
 			task = pid_task(v, PIDTYPE_PID);
 			ret = send_sig_info(s, &info, task);
 			printk(KERN_INFO
 			       "sent signal %d to process %d and returned %d",
-		       s, p, ret);
+			       s, p, ret);
 		}
 		ptr++;
 		ptr = strchr(ptr, '\n');
@@ -71,9 +67,8 @@ static void work_handler(struct work_struct * _work)
 	schedule_delayed_work(&work, WQ_TIMER_DELAY);
 }
 
-static ssize_t procfile_read(
-		struct file *file, char __user *buffer, size_t count, loff_t *ppos
-		)
+static ssize_t procfile_read(struct file *file, char __user *buffer,
+			     size_t count, loff_t *ppos)
 {
 	int ret, c;
 
@@ -89,12 +84,13 @@ static ssize_t procfile_read(
 	return ret;
 }
 
-static ssize_t procfile_write(
-		struct file *file, const char __user *buffer,size_t count, loff_t *ppos)
+static ssize_t procfile_write(struct file *file, const char __user *buffer,
+			      size_t count, loff_t *ppos)
 {
-	printk(KERN_INFO "procfile_write (/proc/%s) called with count %d\n", PROCFS_NAME, count);
+	printk(KERN_INFO "procfile_write (/proc/%s) called with count %d\n",
+	       PROCFS_NAME, count);
 	procfs_buffer_size = count;
-	
+
 	if (*ppos > 0) {
 		return -EFAULT;
 	}
@@ -107,7 +103,7 @@ static ssize_t procfile_write(
 		return -EFAULT;
 	}
 	procfs_buffer[procfs_buffer_size] = '\0';
-	
+
 	*ppos = strlen(procfs_buffer);
 	return procfs_buffer_size;
 }
@@ -122,14 +118,15 @@ int init_module()
 	Sig_Target = proc_create(PROCFS_NAME, PERMS, NULL, &ops);
 
 	if (Sig_Target == NULL) {
-		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n", PROCFS_NAME);
+		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n",
+		       PROCFS_NAME);
 		return -ENOMEM;
 	}
 	printk(KERN_ALERT "/proc/%s created\n", PROCFS_NAME);
 
 	my_workqueue = alloc_workqueue(WORK_QUEUE_NAME, WQ_UNBOUND, 1);
-	INIT_DELAYED_WORK(&work, work_handler); 
-    schedule_delayed_work(&work, WQ_TIMER_DELAY); 
+	INIT_DELAYED_WORK(&work, work_handler);
+	schedule_delayed_work(&work, WQ_TIMER_DELAY);
 	return 0;
 }
 
