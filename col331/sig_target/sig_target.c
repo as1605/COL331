@@ -5,32 +5,31 @@
 #include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <linux/interrupt.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <signal.h>
+#include <linux/string.h>
+#include <linux/sched/signal.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 #define AUTHOR "Aditya Singh <ee1200461@iitd.ac.in>"
 #define PROCFS_MAX_SIZE 1024
 #define PROCFS_NAME "sig_target"
 #define PERMS 0666
 #define WORK_QUEUE_NAME "WQsig_target.c"
-#define WQ_TIMER_DELAY 1000 /* 1000 Jiffies = 1 second */
+#define WQ_TIMER_MS 1000 /* 1000 ms */
 
 MODULE_AUTHOR(AUTHOR);
 
 static int timer_interrupt_count = 0;
-static void intrpt_routine(void *);
 
-static struct workqueue_struct *my_workqueue;
-static struct work_struct Task;
-static DECLARE_WORK(Task, intrpt_routine, NULL);
+static struct workqueue_struct *my_workqueue = NULL;
+static struct work_struct work;
+// static DECLARE_WORK(Task, intrpt_routine, NULL);
 
 static struct proc_dir_entry *Sig_Target;
 static char procfs_buffer[PROCFS_MAX_SIZE];
 static unsigned long procfs_buffer_size = 0;
 
-static void intrpt_routine(void *)
+static void work_handler(struct work_struct * work)
 {
 	timer_interrupt_count++;
 
@@ -55,7 +54,7 @@ static void intrpt_routine(void *)
 		ptr = strchr(ptr, '\n');
 	}
 
-	queue_delayed_work(my_workqueue, &Task, WQ_TIMER_DELAY);
+	msleep(WQ_TIMER_MS);
 }
 
 int procfile_read(char *buffer, char **buffer_location, off_t offset,
@@ -68,7 +67,7 @@ int procfile_read(char *buffer, char **buffer_location, off_t offset,
 	if (offset > 0) {
 		ret = 0;
 	} else {
-		memcpy(buffer, procfs_buffer, procfs_buffer_size);
+		copy_to_user(buffer, procfs_buffer, procfs_buffer_size);
 		ret = procfs_buffer_size;
 	}
 
@@ -90,31 +89,30 @@ int procfile_write(struct file *file, const char *buffer, unsigned long count,
 	return procfs_buffer_size;
 }
 
+static struct proc_ops ops = {
+	.proc_read = procfile_read,
+	.proc_write = procfile_write,
+};
+
 int init_module()
 {
-	Sig_Target = create_proc_entry(PROCFS_NAME, PERMS, NULL);
+	Sig_Target = proc_create(PROCFS_NAME, PERMS, NULL, &ops);
 
 	if (Sig_Target == NULL) {
-		remove_proc_entry(PROCFS_NAME, &proc_root);
-		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n",
-		       PROCFS_NAME);
+		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n", PROCFS_NAME);
 		return -ENOMEM;
 	}
 
-	Sig_Target->read_proc = procfile_read;
-	Sig_Target->write_proc = procfile_write;
-	Sig_Target->owner = THIS_MODULE;
-	Sig_Target->mode = S_IFREG | S_IRUGO;
-	Sig_Target->uid = 0;
-	Sig_Target->gid = 0;
-	Sig_Target->size = 37;
-
 	printk(KERN_INFO "/proc/%s created\n", PROCFS_NAME);
+
+	my_workqueue = alloc_workqueue(WORK_QUEUE_NAME, WQ_UNBOUND, 1);
+	INIT_WORK(&work, work_handler); 
+    schedule_work(&work); 
 	return 0;
 }
 
 void cleanup_module()
 {
-	remove_proc_entry(PROCFS_NAME, &proc_root);
+	proc_remove(Sig_Target);
 	printk(KERN_INFO "/proc/%s removed\n", PROCFS_NAME);
 }
