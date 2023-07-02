@@ -2,7 +2,24 @@
 [Assignment 1](https://www.cse.iitd.ac.in/~srsarangi/courses/2023/col_331_2023/hw/OS_A1_hard.pdf)  of [Prof. Smruti R. Sarangi](https://www.youtube.com/@srsarangi)'s [COL331](https://www.cse.iitd.ac.in/~srsarangi/courses/2023/col_331_2023/index.html) course on Operating Systems in 2023. 
 
 Modifying the Linux kernel (v6.1.6) to add a system call for track context switches and a kernel module to generate signals to any process.
-
+- [Install Linux](#install-linux)
+  * [Machine](#machine)
+  * [Source](#source)
+  * [Config](#config)
+  * [Installation](#installation)
+- [Context Switch Tracker](#context-switch-tracker)
+  * [System Call](#system-call)
+  * [Linked List](#linked-list)
+- [On Demand Signal Generator using a Kernel Module](#on-demand-signal-generator-using-a-kernel-module)
+  * [Setup: Module](#setup-module)
+  * [Input: /proc/sig_target "file"](#input-procsig_target-file)
+  * [Timer: Work Queue](#timer-work-queue)
+  * [Signal: send_sig_info](#signal-send_sig_info)
+- [Appendix](#appendix)
+  * [Snippets](#snippets)
+    + [ctx_switch.h](#ctx_switchh)
+    + [ctx_switch.c](#ctx_switchc)
+    + [sig_target.c](#sig_targetc)
 # Install Linux
 
 ## Machine
@@ -56,8 +73,9 @@ successfully installed.
 The `make` step took a very long time (around 10-12 hours) as the
 machine I was using had only 2 cores and no SSD.
 
-<img src="img/A1.JPG" style="width:50.0%" alt="image" />
-<img src="img/A2.JPG" style="width:50.0%" alt="image" />
+![grub](screenshot_1.jpg)
+
+![tty](screenshot_2.jpg)
 
 # Context Switch Tracker
 
@@ -123,8 +141,7 @@ For the testing, I created a dummy function `foo()` which runs a loop
 for 10<sup>8</sup> times then sleeps for 1 second, so we have both
 involuntary and voluntary context switches for that process.
 
-<img src="img/A3.JPG" alt="image" />
-
+![syscall](screenshot_3.jpg)
 # On Demand Signal Generator using a Kernel Module
 
 ## Setup: Module
@@ -194,7 +211,7 @@ in the info.
 While testing, we can try sending signal 9 (SIGKILL) to processes and
 see if they’re killed.
 
-<img src="img/A4.JPG" alt="image" />
+![kernel module](screenshot_4.jpg)
 
 # Appendix
 
